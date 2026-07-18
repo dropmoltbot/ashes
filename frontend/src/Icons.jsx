@@ -1,28 +1,5 @@
-// Custom gothic SVG components for ASHES
-
-export const AshesLogo = ({ size = 140, animated = false }) => (
-  <svg viewBox="0 0 120 140" width={size} height={size * 1.16} fill="none" style={{ filter: 'drop-shadow(0 0 24px rgba(139,24,24,0.5))' }}>
-    {/* Gothic arch shape */}
-    <path d="M60 0 L82 18 L82 58 L102 78 L102 112 L82 132 L38 132 L18 112 L18 78 L38 58 L38 18 Z"
-      fill="none" stroke="rgb(196,72,72)" strokeWidth="1.2" opacity="0.5" strokeLinejoin="round" />
-    {/* Inner ornate cross */}
-    <path d="M60 22 L60 118 M48 50 L72 50 M42 88 L78 88"
-      stroke="rgb(232,220,200)" strokeWidth="2.5" strokeLinecap="round" fill="none" />
-    {/* Flame above cross */}
-    <path d="M60 8 Q54 16 58 22 Q60 18 62 22 Q66 16 60 8 Z"
-      fill="rgb(255,107,28)" opacity="0.85" />
-    {/* Cross base — skull diamond */}
-    <path d="M60 100 L65 110 L60 120 L55 110 Z"
-      fill="none" stroke="rgb(196,72,72)" strokeWidth="1.5" opacity="0.7" />
-    {/* Ornamental side flourishes */}
-    <path d="M30 70 Q25 75 28 82 M90 70 Q95 75 92 82"
-      stroke="rgb(196,72,72)" strokeWidth="1" strokeLinecap="round" opacity="0.5" fill="none" />
-    <path d="M30 64 Q26 68 28 72 M90 64 Q94 68 92 72"
-      stroke="rgb(196,72,72)" strokeWidth="0.8" strokeLinecap="round" opacity="0.4" fill="none" />
-    {/* Top decorative dot */}
-    <circle cx="60" cy="0" r="1.5" fill="rgb(196,72,72)" />
-  </svg>
-)
+// Custom gothic SVG components for ASHES — uses the detailed logo from AshesLogo.jsx
+export { AshesLogo } from './AshesLogo'
 
 export const SkullIcon = ({ size = 20 }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} fill="currentColor">

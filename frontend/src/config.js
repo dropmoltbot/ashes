@@ -11,7 +11,7 @@ const monadTestnet = {
 export const CONTRACT = '0x676A091c15C2e6ad323070a8e1C1a28718fE2De5'
 export const config = getDefaultConfig({
   appName: 'ASHES',
-  projectId: 'b58f6f8e2b2f8e2c8a2f8e2c8a2f8e2c',
+  projectId: '9b7978df7340069dbaf085e3ea5e7de5',
   chains: [monadTestnet],
   transports: { [monadTestnet.id]: http() }
 })
