@@ -151,13 +151,16 @@ function ActionTabs() {
   const withdraw = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'withdraw' })
   const updateBen = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'updateBeneficiary' })
   const claim = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'claim' })
-  const handle = async (fn, label, arg) => {
+  const handle = async (fn, label, arg, isPayable, valueEth) => {
     try {
       setToast({ msg: label + ' pending...', type: 'ok' })
-      const tx = arg !== undefined ? await fn.writeAsync(arg) : await fn.writeAsync()
-      await tx.wait()
-      setToast({ msg: label + ' done ✓', type: 'ok' })
-    } catch (e) { setToast({ msg: e.message.slice(0, 80), type: 'err' }) }
+      const cfg = {}
+      if (arg !== undefined) cfg.args = Array.isArray(arg) ? arg : [arg]
+      if (isPayable && valueEth) cfg.value = parseEther(String(valueEth))
+      const tx = await fn.writeContractAsync(cfg)
+      if (tx?.hash) setToast({ msg: label + ' sent ✓ ' + tx.hash.slice(0, 10) + '...', type: 'ok' })
+      else setToast({ msg: label + ' done ✓', type: 'ok' })
+    } catch (e) { setToast({ msg: (e.shortMessage || e.message || 'failed').slice(0, 80), type: 'err' }) }
   }
   const tabs = [
     { id: 'checkIn', label: 'Ritual', icon: <FlameIcon size={16} /> },
@@ -200,7 +203,7 @@ function ActionTabs() {
               <p className="panel-desc">Deposit MON as offering.</p>
               <input className="input" placeholder="0.05" value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(fund,'Offer',{value:parseEther(input||'0.01')})}
+                onClick={()=>handle(fund,'Offer',undefined,true,(input||'0.01'))}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Deposit Offering</motion.button>
@@ -211,7 +214,7 @@ function ActionTabs() {
               <p className="panel-desc">Reclaim from the ashes.</p>
               <input className="input" placeholder="0.01" value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(withdraw,'Reclaim',parseEther(input||'0.01'))}
+                onClick={()=>handle(withdraw,'Reclaim',[parseEther(input||'0.01')])}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Reclaim MON</motion.button>
@@ -222,7 +225,7 @@ function ActionTabs() {
               <p className="panel-desc">Designate a new heir.</p>
               <input className="input" placeholder="0x..." value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(updateBen,'Heir',input)}
+                onClick={()=>handle(updateBen,'Heir',[input])}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Update Heir</motion.button>
