@@ -154,13 +154,21 @@ function ActionTabs() {
   const handle = async (fn, label, arg, isPayable, valueEth) => {
     try {
       setToast({ msg: label + ' pending...', type: 'ok' })
-      const cfg = {}
-      if (arg !== undefined) cfg.args = Array.isArray(arg) ? arg : [arg]
-      if (isPayable && valueEth) cfg.value = parseEther(String(valueEth))
+      const cfg = { abi: ABI, address: CONTRACT, functionName: fn.functionName || label.toLowerCase() }
+      // sanitize args
+      if (arg !== undefined && arg !== null) {
+        cfg.args = Array.isArray(arg) ? arg : [arg]
+      }
+      if (isPayable && valueEth) {
+        try { cfg.value = parseEther(String(valueEth)) } catch(e) { setToast({ msg: 'Invalid amount', type: 'err' }); return }
+      }
       const tx = await fn.writeContractAsync(cfg)
       if (tx?.hash) setToast({ msg: label + ' sent ✓ ' + tx.hash.slice(0, 10) + '...', type: 'ok' })
       else setToast({ msg: label + ' done ✓', type: 'ok' })
-    } catch (e) { setToast({ msg: (e.shortMessage || e.message || 'failed').slice(0, 80), type: 'err' }) }
+    } catch (e) {
+      const msg = e?.shortMessage || e?.message || 'tx failed'
+      setToast({ msg: msg.slice(0, 80), type: 'err' })
+    }
   }
   const tabs = [
     { id: 'checkIn', label: 'Ritual', icon: <FlameIcon size={16} /> },
