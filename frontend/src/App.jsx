@@ -151,10 +151,10 @@ function ActionTabs() {
   const withdraw = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'withdraw' })
   const updateBen = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'updateBeneficiary' })
   const claim = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'claim' })
-  const handle = async (fn, label, arg, isPayable, valueEth) => {
+  const handle = async (fn, label, functionName, arg, isPayable, valueEth) => {
     try {
       setToast({ msg: label + ' pending...', type: 'ok' })
-      const cfg = { abi: ABI, address: CONTRACT, functionName: fn.functionName || label.toLowerCase() }
+      const cfg = { abi: ABI, address: CONTRACT, functionName }
       // sanitize args
       if (arg !== undefined && arg !== null) {
         cfg.args = Array.isArray(arg) ? arg : [arg]
@@ -200,7 +200,7 @@ function ActionTabs() {
             <motion.div className="panel active" key="checkIn" {...tabVariant}>
               <p className="panel-desc">Confirm your existence. Resets the countdown.</p>
               <motion.button className="btn-primary"
-                onClick={()=>handle(checkIn,'Ritual')}
+                onClick={()=>handle(checkIn,'Ritual','checkIn')}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Perform Ritual</motion.button>
@@ -211,7 +211,7 @@ function ActionTabs() {
               <p className="panel-desc">Deposit MON as offering.</p>
               <input className="input" placeholder="0.05" value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(fund,'Offer',undefined,true,(input||'0.01'))}
+                onClick={()=>handle(fund,'Offer','fund',undefined,true,(input||'0.01'))}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Deposit Offering</motion.button>
@@ -222,7 +222,7 @@ function ActionTabs() {
               <p className="panel-desc">Reclaim from the ashes.</p>
               <input className="input" placeholder="0.01" value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(withdraw,'Reclaim',[parseEther(input||'0.01')])}
+                onClick={()=>handle(withdraw,'Reclaim','withdraw',[parseEther(input||'0.01')])}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Reclaim MON</motion.button>
@@ -233,7 +233,7 @@ function ActionTabs() {
               <p className="panel-desc">Designate a new heir.</p>
               <input className="input" placeholder="0x..." value={input} onChange={e=>setInput(e.target.value)} />
               <motion.button className="btn-primary"
-                onClick={()=>handle(updateBen,'Heir',[input])}
+                onClick={()=>handle(updateBen,'Heir','updateBeneficiary',[input])}
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
               >Update Heir</motion.button>
@@ -243,7 +243,7 @@ function ActionTabs() {
             <motion.div className="panel active" key="claim" {...tabVariant}>
               <p className="panel-desc">If the owner stopped their rituals, claim their legacy.</p>
               <motion.button className="btn-primary btn-claim"
-                onClick={()=>handle(claim,'Claim')}
+                onClick={()=>handle(claim,'Claim','claim')}
                 whileHover={{ scale: 1.02, y: -2, boxShadow: '0 8px 50px rgba(255,107,28,0.4)' }}
                 whileTap={{ scale: 0.98 }}
               >Claim From The Dead</motion.button>
