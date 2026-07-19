@@ -16,6 +16,11 @@ const short = a => a ? a.slice(0,6)+'...'+a.slice(-4) : '—'
 
 // Contract address can be: (a) user's own deployed contract (persisted localStorage), (b) the demo contract
 const DEMO_CONTRACT = '0x676A091c15C2e6ad323070a8e1C1a28718fE2De5'
+const isValidAddr = a => typeof a === 'string' && /^0x[a-fA-F0-9]{40}$/.test(a)
+const getInitialContract = () => {
+  const stored = (typeof localStorage !== 'undefined') ? localStorage.getItem('ashes_contract') : null
+  return isValidAddr(stored) ? stored : DEMO_CONTRACT
+}
 const ContractCtx = createContext(null)
 const useContract = () => useContext(ContractCtx)
 
@@ -169,6 +174,13 @@ function ActionTabs() {
       if (isPayable && valueEth) {
         try { cfg.value = parseEther(String(valueEth)) } catch(e) { setToast({ msg: 'Invalid amount', type: 'err' }); return }
       }
+      // Client-side guards (contract also enforces these onchain)
+      if (functionName === 'updateBeneficiary' && cfg.args && cfg.args[0]) {
+        if (!isValidAddr(cfg.args[0])) { setToast({ msg: 'Invalid heir address', type: 'err' }); return }
+      }
+      if (functionName === 'withdraw' && cfg.args && cfg.args[0] !== undefined && typeof cfg.args[0] === 'string') {
+        try { cfg.args = [parseEther(cfg.args[0])] } catch(e) { setToast({ msg: 'Invalid amount', type: 'err' }); return }
+      }
       // Explicit gas to avoid gas-estimate failure when contract would revert (common on Monad testnet)
       cfg.gas = 200000n
       const tx = await fn.writeContractAsync(cfg)
@@ -275,8 +287,8 @@ function Forge() {
 
   const handleDeploy = async () => {
     if (!isConnected) { setToast({msg:'Connect wallet first', type:'err'}); return }
-    if (!benInput || !benInput.startsWith('0x') || benInput.length !== 42) {
-      setToast({msg:'Invalid heir address', type:'err'}); return
+    if (!isValidAddr(benInput)) {
+      setToast({msg:'Invalid heir address (must be 0x... 40 hex)', type:'err'}); return
     }
     if (benInput.toLowerCase() === address?.toLowerCase()) {
       setToast({msg:'Self-heir not allowed', type:'err'}); return
@@ -369,7 +381,7 @@ function Dashboard() {
 
 function Inner() {
   const { isConnected } = useAccount()
-  const [contract, setContract] = useState(() => localStorage.getItem('ashes_contract') || DEMO_CONTRACT)
+  const [contract, setContract] = useState(getInitialContract)
   const value = { contract, setContract, address: contract }
   return (
     <ContractCtx.Provider value={value.address}>

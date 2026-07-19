@@ -90,6 +90,7 @@ contract DeadManSwitch {
     /// @notice Update the timeout period
     function updateTimeout(uint256 _newTimeout) external onlyOwner notCanceled notClaimed {
         require(_newTimeout > 0, "Timeout must be > 0");
+        require(_newTimeout <= 365 days, "Timeout exceeds 1 year");
 
         uint256 old = timeout;
         timeout = _newTimeout;
