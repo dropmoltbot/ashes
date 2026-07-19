@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, createContext, useContext } from 'react'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import { WagmiProvider, useAccount, useContractRead, useContractWrite } from 'wagmi'
+import { WagmiProvider, useAccount, useContractRead, useContractWrite, useDeployContract } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { formatEther, parseEther } from 'viem'
 import { motion, AnimatePresence } from 'framer-motion'
-import { config, CONTRACT } from './config'
+import { config } from './config'
 import { ABI } from './abi'
+import { BYTECODE } from './bytecode'
 import { AshesLogo, SkullIcon, UrnIcon, FlameIcon, CrownIcon, DividerSvg } from './Icons'
 import { GothicConnectButton } from './GothicConnect'
 import Landing from './Landing'
 
 const qc = new QueryClient()
 const short = a => a ? a.slice(0,6)+'...'+a.slice(-4) : '—'
+
+// Contract address can be: (a) user's own deployed contract (persisted localStorage), (b) the demo contract
+const DEMO_CONTRACT = '0x676A091c15C2e6ad323070a8e1C1a28718fE2De5'
+const ContractCtx = createContext(null)
+const useContract = () => useContext(ContractCtx)
 
 // === Framer Motion variants for fluid animations ===
 const fadeUp = {
@@ -112,7 +118,8 @@ function StatRow({ label, value, glow }) {
 }
 
 function Stats() {
-  const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner' })
+  const CONTRACT = useContract()
+  const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner', enabled: !!CONTRACT })
   const beneficiary = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'beneficiary' })
   const lastCheckIn = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'lastCheckIn' })
   const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout' })
@@ -143,6 +150,7 @@ function Stats() {
 }
 
 function ActionTabs() {
+  const CONTRACT = useContract()
   const [tab, setTab] = useState('checkIn')
   const [toast, setToast] = useState({ msg: '', type: '' })
   const [input, setInput] = useState('')
@@ -257,8 +265,94 @@ function ActionTabs() {
   )
 }
 
+function Forge() {
+  const { isConnected, address } = useAccount()
+  const deploy = useDeployContract()
+  const setContract = useContractSet()
+  const [benInput, setBenInput] = useState('')
+  const [days, setDays] = useState(30)
+  const [toast, setToast] = useState({ msg: '', type: '' })
+
+  const handleDeploy = async () => {
+    if (!isConnected) { setToast({msg:'Connect wallet first', type:'err'}); return }
+    if (!benInput || !benInput.startsWith('0x') || benInput.length !== 42) {
+      setToast({msg:'Invalid heir address', type:'err'}); return
+    }
+    if (benInput.toLowerCase() === address?.toLowerCase()) {
+      setToast({msg:'Self-heir not allowed', type:'err'}); return
+    }
+    if (days < 1 || days > 365) {
+      setToast({msg:'Timeout 1-365 days', type:'err'}); return
+    }
+    try {
+      setToast({msg:'Forging your switch...', type:'ok'})
+      const hash = await deploy.deployContract({
+        abi: ABI,
+        bytecode: BYTECODE,
+        args: [benInput, Number(days) * 86400],
+        gas: 1500000n,
+      })
+      if (hash) {
+        setToast({msg:'Switch forged! polling for address...', type:'ok'})
+        const receipt = await deploy.waitForDeployment?.() || null
+        const tc = await import('wagmi').then(m => m.waitForTransactionReceipt)
+        const r = await tc({ hash, chainId: 10143 })
+        if (r?.contractAddress) {
+          setContract(r.contractAddress)
+          localStorage.setItem('ashes_contract', r.contractAddress)
+          setToast({msg:'Switch live at ' + short(r.contractAddress), type:'ok'})
+        }
+      }
+    } catch (e) {
+      const msg = e?.shortMessage || e?.message || 'deploy failed'
+      setToast({msg: msg.slice(0, 80), type:'err'})
+    }
+  }
+
+  return (
+    <motion.div className="card forge-card" {...cardVariant}
+      style={{ maxWidth: 500, margin: '0 auto 30px auto', padding: '28px' }}
+    >
+      <h2 className="section-title font-gothic">Forge Your Switch</h2>
+      <p className="panel-desc">Anyone can forge their own on-chain dead-man switch. You become its owner; the chain enforces your will after death.</p>
+
+      <div style={{ marginBottom: 18 }}>
+        <label className="stat-label">HEIR ADDRESS</label>
+        <input className="input" placeholder="0x... (beneficiary, not yourself)"
+          value={benInput} onChange={e=>setBenInput(e.target.value)} />
+      </div>
+
+      <div style={{ marginBottom: 18 }}>
+        <label className="stat-label">TIMEOUT (DAYS): <span style={{color:'var(--ember)'}}>{days}</span></label>
+        <input type="range" min="1" max="365" value={days}
+          onChange={e=>setDays(e.target.value)}
+          style={{ width: '100%', accentColor: '#f6851b', cursor: 'pointer' }} />
+      </div>
+
+      <motion.button className="btn-primary btn-forge"
+        onClick={handleDeploy}
+        whileHover={{ scale: 1.02, y: -2, boxShadow: '0 12px 50px rgba(255,107,28,0.5)' }}
+        whileTap={{ scale: 0.98 }}
+        disabled={deploy.isPending}
+        style={{ width: '100%' }}
+      >
+        {deploy.isPending ? 'Forging...' : 'Forge Your Switch'}
+      </motion.button>
+      <AnimatePresence>
+        {toast.msg && (
+          <motion.div className={'toast ' + (toast.type === 'err' ? 'toast-err' : 'toast-ok')}
+            initial={{ x: 120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 120, opacity: 0 }}
+            style={{ position: 'static', marginTop: 14 }}
+          >{toast.msg}</motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
 function Dashboard() {
-  const remaining = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeRemaining', refetchInterval: 5000 })
+  const CONTRACT = useContract()
+  const remaining = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeRemaining', refetchInterval: 5000, enabled: !!CONTRACT })
   const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout' })
   return (
     <motion.div className="container"
@@ -275,56 +369,68 @@ function Dashboard() {
 
 function Inner() {
   const { isConnected } = useAccount()
+  const [contract, setContract] = useState(() => localStorage.getItem('ashes_contract') || DEMO_CONTRACT)
+  const value = { contract, setContract, address: contract }
   return (
-    <div className="app">
-      <AshFlakes />
-      <motion.header className="hero" {...fadeUp}>
+    <ContractCtx.Provider value={value.address}>
+      <div className="app">
+        <AshFlakes />
+        <motion.header className="hero" {...fadeUp}>
+          <motion.div
+            animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.1, 1] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <AshesLogo size={140} />
+          </motion.div>
+          <h1 className="title font-gothic">ASHES</h1>
+          <p className="subtitle">Ensure your crypto lives on, even when you don't.</p>
+          <DividerSvg width={180} />
+        </motion.header>
         <motion.div
-          animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.1, 1] }}
-          transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+          style={{ maxWidth: 760, margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'center' }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
         >
-          <AshesLogo size={140} />
+          <GothicConnectButton />
         </motion.div>
-        <h1 className="title font-gothic">ASHES</h1>
-        <p className="subtitle">Ensure your crypto lives on, even when you don't.</p>
-        <DividerSvg width={180} />
-      </motion.header>
-      <motion.div
-        style={{ maxWidth: 760, margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'center' }}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5, duration: 0.6 }}
-      >
-        <GothicConnectButton />
-      </motion.div>
-      <div style={{ height: 40 }} />
-      <AnimatePresence mode="wait">
-        {isConnected ? (
-          <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Dashboard />
-          </motion.div>
-        ) : (
-          <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Landing />
-          </motion.div>
-        )}
-      </AnimatePresence>
-      <footer className="footer">
-        <motion.p className="footer-contract"
-          whileHover={{ color: 'var(--ember)' }}
-          transition={{ duration: 0.2 }}
-          style={{ cursor: 'pointer' }}
-          onClick={() => { navigator.clipboard.writeText(CONTRACT); alert('Contract address copied') }}
-          title="Click to copy"
-        >CONTRACT :: {CONTRACT.slice(0,20)}...{CONTRACT.slice(-6)} ⎘</motion.p>
-        <p className="footer-sig">† BUILT ON MONAD · BY dropxtor †</p>
-        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 12 }}>
-          <a href="https://github.com/dropmoltbot/ashes" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>GITHUB ↗</a>
-          <a href={`https://testnet.monadexplorer.com/address/${CONTRACT}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>EXPLORER ↗</a>
-          <a href="https://x.com/0xDropxtor" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>X ↗</a>
-        </div>
-      </footer>
-    </div>
+        <div style={{ height: 40 }} />
+        <AnimatePresence mode="wait">
+          {isConnected ? (
+            <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Forge />
+              <Dashboard />
+            </motion.div>
+          ) : (
+            <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Landing />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <footer className="footer">
+          <motion.p className="footer-contract"
+            whileHover={{ color: 'var(--ember)' }}
+            transition={{ duration: 0.2 }}
+            style={{ cursor: 'pointer' }}
+            onClick={() => { navigator.clipboard.writeText(value.address); alert('Contract address copied') }}
+            title="Click to copy"
+          >CONTRACT :: {value.address.slice(0,20)}...{value.address.slice(-6)} ⎘</motion.p>
+          {contract !== DEMO_CONTRACT && (
+            <motion.button
+              onClick={() => { localStorage.removeItem('ashes_contract'); setContract(DEMO_CONTRACT) }}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              style={{ textTransform: 'none', font: 'inherit', background: 'transparent', color: 'var(--bone-fade)', padding: '4px 12px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, marginTop: 8 }}
+            >← back to demo switch</motion.button>
+          )}
+          <p className="footer-sig">† BUILT ON MONAD · BY dropxtor †</p>
+          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 12 }}>
+            <a href="https://github.com/dropmoltbot/ashes" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>GITHUB ↗</a>
+            <a href={`https://testnet.monadexplorer.com/address/${value.address}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>EXPLORER ↗</a>
+            <a href="https://x.com/0xDropxtor" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>X ↗</a>
+          </div>
+        </footer>
+      </div>
+    </ContractCtx.Provider>
   )
 }
 
