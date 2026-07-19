@@ -298,15 +298,34 @@ function Forge({ prominent }) {
   const [pendingHash, setPendingHash] = useState(null)
   const receipt = useWaitForTransactionReceipt({ hash: pendingHash, chainId: 10143 })
 
-  // When receipt arrives, extract contract address from logs
+  // When receipt arrives, extract contract address from logs (Deployed event is emitted in first log)
   useEffect(() => {
-    if (receipt?.contractAddress) {
-      setContract(receipt.contractAddress)
-      localStorage.setItem('ashes_contract', receipt.contractAddress)
-      setToast({msg:'Switch live at ' + short(receipt.contractAddress), type:'ok'})
+    if (!receipt) return
+    // Try viem's contractAddress field first
+    let deployedAt = receipt.contractAddress
+    // Fallback: pick first log's address (Deployed event is emitted by the contract itself)
+    if (!deployedAt && receipt.logs && receipt.logs.length > 0) {
+      deployedAt = receipt.logs[0].address
+    }
+    // Final fallback: scan logs for an event that's not the from-address
+    if (!deployedAt && receipt.logs) {
+      for (const log of receipt.logs) {
+        if (log.address && (!address || log.address.toLowerCase() !== address.toLowerCase())) {
+          deployedAt = log.address
+          break
+        }
+      }
+    }
+    if (deployedAt) {
+      setContract(deployedAt)
+      localStorage.setItem('ashes_contract', deployedAt)
+      setToast({ msg: 'Switch live at ' + short(deployedAt), type: 'ok' })
+      setPendingHash(null)
+    } else {
+      setToast({ msg: 'Mined but contract address unresolved — check explorer', type: 'err' })
       setPendingHash(null)
     }
-  }, [receipt])
+  }, [receipt, address, setContract])
 
   const handleDeploy = async () => {
     if (!isConnected) { setToast({msg:'Connect wallet first', type:'err'}); return }

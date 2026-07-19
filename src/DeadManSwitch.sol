@@ -52,11 +52,14 @@ contract DeadManSwitch {
         _;
     }
 
+    event Deployed(address indexed owner, address indexed beneficiary, uint256 timeout);
+
     /* ── Constructor ── */
     constructor(address _beneficiary, uint256 _timeout) payable {
         require(_beneficiary != address(0), "Invalid beneficiary");
         require(_beneficiary != msg.sender, "Beneficiary cannot be owner");
         require(_timeout > 0, "Timeout must be > 0");
+        require(_timeout <= 365 days, "Timeout exceeds 1 year");
 
         owner = msg.sender;
         beneficiary = _beneficiary;
@@ -66,6 +69,7 @@ contract DeadManSwitch {
         if (msg.value > 0) {
             emit Funded(msg.sender, msg.value, address(this).balance);
         }
+        emit Deployed(msg.sender, _beneficiary, _timeout);
     }
 
     /* ── Owner functions ── */
