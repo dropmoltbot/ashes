@@ -164,7 +164,7 @@ function Stats() {
   )
 }
 
-function ActionTabs() {
+function ActionTabs({ readOnly }) {
   const CONTRACT = useContract()
   const [tab, setTab] = useState('checkIn')
   const [toast, setToast] = useState({ msg: '', type: '' })
@@ -175,6 +175,7 @@ function ActionTabs() {
   const updateBen = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'updateBeneficiary' })
   const claim = useContractWrite({ address: CONTRACT, abi: ABI, functionName: 'claim' })
   const handle = async (fn, label, functionName, arg, isPayable, valueEth) => {
+    if (readOnly) { setToast({ msg: 'Read-only: forge your own switch to interact', type: 'err' }); return }
     try {
       setToast({ msg: label + ' pending...', type: 'ok' })
       const cfg = { abi: ABI, address: CONTRACT, functionName }
@@ -374,18 +375,42 @@ function Forge() {
 
 function Dashboard() {
   const CONTRACT = useContract()
+  const { address } = useAccount()
   const enabled = !!CONTRACT
   const remaining = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeRemaining', refetchInterval: 30000, enabled })
-  const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout' })
+  const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout', enabled })
+  const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner', enabled })
+
+  // Is the connected wallet the owner of the displayed contract? (false = demo contract belongs to someone else)
+  const isOwner = owner.data && address && owner.data.toLowerCase() === address.toLowerCase()
+  const isDemo = CONTRACT === DEMO_CONTRACT
+  const readOnly = !isOwner  // connected user is not the owner → read-only mode
+
   return (
     <motion.div className="container"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
     >
+      {(readOnly || isDemo) && (
+        <motion.div className="card read-only-banner" style={{
+          background: 'linear-gradient(135deg, rgba(139,24,24,0.12), rgba(255,107,28,0.06))',
+          borderColor: 'rgba(255,107,28,0.3)'
+        }} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+          <div style={{ color: 'var(--ember-soft)', fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: '0.15em', marginBottom: 8 }}>
+            {isDemo ? 'VIEWING DEMO SWITCH' : 'VIEWING SOMEONE ELSE\u2019S SWITCH'}
+          </div>
+          <p className="panel-desc" style={{ marginBottom: 12 }}>
+            {isDemo
+              ? 'This read-only demo belongs to dropxtor. To interact onchain (check-in, fund, claim), forge your own.'
+              : 'You are not the owner of this switch. Only its owner can interact with it.'}
+          </p>
+        </motion.div>
+      )}
+
       <motion.div className="card timer-card" {...cardVariant}>
         <TimerRing remaining={remaining.data || 0n} timeout={timeout.data || 1n} />
       </motion.div>
       <Stats />
-      <ActionTabs />
+      <ActionTabs readOnly={readOnly} />
     </motion.div>
   )
 }
