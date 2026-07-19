@@ -49,13 +49,13 @@ function AshFlakes() {
   useEffect(() => {
     const c = document.querySelector('.ash-container')
     if (!c || c.children.length) return
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 24; i++) {  // Reduced from 50 to 24 for perf
       const f = document.createElement('div')
       f.className = 'ash-flake'
       f.style.left = Math.random()*100+'%'
-      f.style.animationDuration = (4+Math.random()*5)+'s'
+      f.style.animationDuration = (6+Math.random()*7)+'s'
       f.style.animationDelay = Math.random()*6+'s'
-      f.style.opacity = 0.2+Math.random()*0.3
+      f.style.opacity = 0.15+Math.random()*0.25
       c.appendChild(f)
     }
   }, [])
@@ -124,32 +124,40 @@ function StatRow({ label, value, glow }) {
 
 function Stats() {
   const CONTRACT = useContract()
-  const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner', enabled: !!CONTRACT })
-  const beneficiary = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'beneficiary' })
-  const lastCheckIn = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'lastCheckIn' })
-  const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout' })
-  const balance = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'balance' })
-  const isDead = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'isDead', refetchInterval: 10000 })
+  const enabled = !!CONTRACT
+  const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner', enabled })
+  const beneficiary = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'beneficiary', enabled })
+  const lastCheckIn = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'lastCheckIn', enabled })
+  const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout', enabled })
+  const balance = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'balance', enabled })
+  const isDead = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'isDead', enabled, refetchInterval: 30000 })
   const lastDate = lastCheckIn.data ? new Date(Number(lastCheckIn.data) * 1000).toLocaleString() : '—'
-  const timeoutDays = timeout.data ? Number(timeout.data) / 86400 : 30
+  const timeoutDays = timeout.data ? Number(timeout.data) / 86400 : 0
+  const isLoading = owner.isLoading || beneficiary.isLoading
   return (
     <motion.div className="card stats" {...cardVariant}>
-      <StatRow label="Owner" value={short(owner.data)} />
-      <StatRow label="Beneficiary" value={short(beneficiary.data)} />
-      <StatRow label="Last Ritual" value={lastDate} />
-      <StatRow label="Timeout" value={timeoutDays + ' days'} />
-      <StatRow label="Offering" value={(balance.data ? formatEther(balance.data) : '0') + ' MON'} glow />
-      <div className="stat-row">
-        <span className="stat-label">Status</span>
-        {isDead.data ? (
-          <motion.span className="stat-status status-dead"
-            animate={{ opacity: [0.7, 1, 0.7] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >CLAIMABLE</motion.span>
-        ) : (
-          <span className="stat-status status-active">ALIVE</span>
-        )}
-      </div>
+      {isLoading ? (
+        <div style={{ textAlign: 'center', padding: 20, opacity: 0.5, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>Loading on-chain state…</div>
+      ) : (
+        <>
+          <StatRow label="Owner" value={short(owner.data)} />
+          <StatRow label="Beneficiary" value={short(beneficiary.data)} />
+          <StatRow label="Last Ritual" value={lastDate} />
+          <StatRow label="Timeout" value={timeoutDays + ' days'} />
+          <StatRow label="Offering" value={(balance.data ? formatEther(balance.data) : '0') + ' MON'} glow />
+          <div className="stat-row">
+            <span className="stat-label">Status</span>
+            {isDead.data ? (
+              <motion.span className="stat-status status-dead"
+                animate={{ opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >CLAIMABLE</motion.span>
+            ) : (
+              <span className="stat-status status-active">ALIVE</span>
+            )}
+          </div>
+        </>
+      )}
     </motion.div>
   )
 }
@@ -364,7 +372,8 @@ function Forge() {
 
 function Dashboard() {
   const CONTRACT = useContract()
-  const remaining = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeRemaining', refetchInterval: 5000, enabled: !!CONTRACT })
+  const enabled = !!CONTRACT
+  const remaining = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeRemaining', refetchInterval: 30000, enabled })
   const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout' })
   return (
     <motion.div className="container"
@@ -380,9 +389,10 @@ function Dashboard() {
 }
 
 function Inner() {
-  const { isConnected } = useAccount()
+  const { isConnected, isReconnecting, isConnecting } = useAccount()
   const [contract, setContract] = useState(getInitialContract)
   const value = { contract, setContract, address: contract }
+  const showDashboard = isConnected && !isConnecting
   return (
     <ContractCtx.Provider value={value.address}>
       <div className="app">
@@ -408,7 +418,12 @@ function Inner() {
         </motion.div>
         <div style={{ height: 40 }} />
         <AnimatePresence mode="wait">
-          {isConnected ? (
+          {isReconnecting ? (
+            <motion.div key="reconnecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              style={{ textAlign: 'center', fontFamily: "'JetBrains Mono', monospace', color: 'var(--bone-fade)' }}>
+              Reconnecting...
+            </motion.div>
+          ) : showDashboard ? (
             <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Forge />
               <Dashboard />
