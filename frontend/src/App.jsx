@@ -288,7 +288,7 @@ function ActionTabs({ readOnly }) {
   )
 }
 
-function Forge() {
+function Forge({ prominent }) {
   const { isConnected, address } = useAccount()
   const deploy = useDeployContract()
   const setContract = useContractSet()
@@ -338,7 +338,7 @@ function Forge() {
   }
 
   return (
-    <motion.div className="card forge-card" {...cardVariant}>
+    <motion.div className="card forge-card" style={prominent ? { maxWidth: 560, margin: '0 auto', padding: '40px 32px', boxShadow: '0 0 60px rgba(255,107,28,0.25)' } : undefined} {...cardVariant}>
       <h2 className="section-title font-gothic">Forge Your Switch</h2>
       <p className="panel-desc">Anyone can forge their own on-chain dead-man switch. You become its owner; the chain enforces your will after death.</p>
 
@@ -390,6 +390,40 @@ function DemoBanner() {
   )
 }
 
+function OnboardingBanner() {
+  return (
+    <motion.div className="card read-only-banner" style={{
+        background: 'linear-gradient(135deg, rgba(139,24,24,0.18), rgba(255,107,28,0.08))',
+        borderColor: 'rgba(255,107,28,0.4)',
+        maxWidth: 560, margin: '0 auto 24px', boxShadow: '0 0 40px rgba(255,107,28,0.15)'
+      }} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <div style={{ color: 'var(--ember-soft)', fontFamily: "'Cinzel', serif", fontSize: 14, letterSpacing: '0.2em', marginBottom: 8 }}>
+        WALLET CONNECTED · NO SWITCH YET
+      </div>
+      <p className="panel-desc">
+        Your wallet is connected but you have not forged a switch yet. Forge one now to become its on-chain owner. Only your switch's owner can perform rituals, fund, withdraw, update heir, or bequeath to a beneficiary.
+      </p>
+    </motion.div>
+  )
+}
+
+function ContractPreviewBanner({ address }) {
+  return (
+    <motion.div className="card read-only-banner" style={{
+        background: 'linear-gradient(135deg, rgba(139,24,24,0.10), rgba(255,107,28,0.04))',
+        borderColor: 'rgba(255,107,28,0.25)',
+        maxWidth: 720, margin: '0 auto 24px'
+      }} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <div style={{ color: 'var(--ember-soft)', fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: '0.15em', marginBottom: 8 }}>
+        VIEWING A SAVED SWITCH
+      </div>
+      <p className="panel-desc">
+        A previously-forged switch is saved in this browser ({address.slice(0,10)}...{address.slice(-6)}). Connect the wallet that owns it to interact onchain.
+      </p>
+    </motion.div>
+  )
+}
+
 function Dashboard() {
   const CONTRACT = useContract()
   const { address } = useAccount()
@@ -398,27 +432,24 @@ function Dashboard() {
   const timeout = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'timeout', enabled })
   const owner = useContractRead({ address: CONTRACT, abi: ABI, functionName: 'owner', enabled })
 
-  // Is the connected wallet the owner of the displayed contract? (false = demo contract belongs to someone else)
+  // Is the connected wallet the owner of the displayed contract? (false = someone injected a foreign addr)
   const isOwner = owner.data && address && owner.data.toLowerCase() === address.toLowerCase()
-  const isDemo = CONTRACT === DEMO_CONTRACT
-  const readOnly = !isOwner  // connected user is not the owner → read-only mode
+  const readOnly = !isOwner  // rare edge case: a foreign contract is in localStorage
 
   return (
     <motion.div className="container"
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6 }}
     >
-      {(readOnly || isDemo) && (
+      {readOnly && (
         <motion.div className="card read-only-banner" style={{
           background: 'linear-gradient(135deg, rgba(139,24,24,0.12), rgba(255,107,28,0.06))',
           borderColor: 'rgba(255,107,28,0.3)'
         }} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <div style={{ color: 'var(--ember-soft)', fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: '0.15em', marginBottom: 8 }}>
-            {isDemo ? 'VIEWING DEMO SWITCH' : 'VIEWING SOMEONE ELSE\u2019S SWITCH'}
+            NOT YOUR SWITCH
           </div>
           <p className="panel-desc" style={{ marginBottom: 12 }}>
-            {isDemo
-              ? 'This read-only demo belongs to dropxtor. To interact onchain (check-in, fund, claim), forge your own.'
-              : 'You are not the owner of this switch. Only its owner can interact with it.'}
+            The displayed switch does not belong to your connected wallet. Forge your own to interact onchain.
           </p>
         </motion.div>
       )}
@@ -437,6 +468,7 @@ function Inner() {
   const [contract, setContract] = useState(getInitialContract)
   const value = { contract, setContract, address: contract }
   const showDashboard = isConnected && !isConnecting
+  const hasOwnContract = isConnected && contract !== DEMO_CONTRACT
   return (
     <ContractCtx.Provider value={value.address}>
       <SetContractCtx.Provider value={setContract}>
@@ -469,13 +501,19 @@ function Inner() {
               Reconnecting...
             </motion.div>
           ) : showDashboard ? (
-            <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <Forge />
-              <Dashboard />
-            </motion.div>
+            hasOwnContract ? (
+              <motion.div key="own-dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <Dashboard />
+              </motion.div>
+            ) : (
+              <motion.div key="onboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <OnboardingBanner />
+                <Forge prominent />
+              </motion.div>
+            )
           ) : (
             <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <DemoBanner />
+              {contract !== DEMO_CONTRACT ? <ContractPreviewBanner address={contract} /> : <DemoBanner />}
               <Landing />
             </motion.div>
           )}
