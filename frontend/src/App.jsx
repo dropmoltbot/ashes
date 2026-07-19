@@ -1,6 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from 'react'
 import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit'
-import { WagmiProvider, useAccount, useContractRead, useContractWrite, useDeployContract } from 'wagmi'
+import { WagmiProvider, useAccount, useContractRead, useContractWrite, useDeployContract, useWaitForTransactionReceipt } from 'wagmi'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { formatEther, parseEther } from 'viem'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -21,8 +21,10 @@ const getInitialContract = () => {
   const stored = (typeof localStorage !== 'undefined') ? localStorage.getItem('ashes_contract') : null
   return isValidAddr(stored) ? stored : DEMO_CONTRACT
 }
-const ContractCtx = createContext(null)
+const ContractCtx = createContext(null)        // address: string
+const SetContractCtx = createContext(null)    // setter: (a) => void
 const useContract = () => useContext(ContractCtx)
+const useContractSet = () => useContext(SetContractCtx)
 
 // === Framer Motion variants for fluid animations ===
 const fadeUp = {
@@ -117,7 +119,7 @@ function StatRow({ label, value, glow }) {
   return (
     <motion.div className="stat-row" whileHover={{ x: 4 }} transition={{ duration: 0.2 }}>
       <span className="stat-label">{label}</span>
-      <span className="stat-value" style={glow ? { textShadow: '0 0 10px rgba(255,107,28,0.6)' } : {}}>{value}</span>
+      <span className={'stat-value' + (glow ? ' stat-glow' : '')}>{value}</span>
     </motion.div>
   )
 }
@@ -137,7 +139,7 @@ function Stats() {
   return (
     <motion.div className="card stats" {...cardVariant}>
       {isLoading ? (
-        <div style={{ textAlign: 'center', padding: 20, opacity: 0.5, fontFamily: "'JetBrains Mono', monospace", fontSize: 12 }}>Loading on-chain state…</div>
+        <div className="loading-state">Loading on-chain state…</div>
       ) : (
         <>
           <StatRow label="Owner" value={short(owner.data)} />
@@ -292,6 +294,18 @@ function Forge() {
   const [benInput, setBenInput] = useState('')
   const [days, setDays] = useState(30)
   const [toast, setToast] = useState({ msg: '', type: '' })
+  const [pendingHash, setPendingHash] = useState(null)
+  const receipt = useWaitForTransactionReceipt({ hash: pendingHash, chainId: 10143 })
+
+  // When receipt arrives, extract contract address from logs
+  useEffect(() => {
+    if (receipt?.contractAddress) {
+      setContract(receipt.contractAddress)
+      localStorage.setItem('ashes_contract', receipt.contractAddress)
+      setToast({msg:'Switch live at ' + short(receipt.contractAddress), type:'ok'})
+      setPendingHash(null)
+    }
+  }, [receipt])
 
   const handleDeploy = async () => {
     if (!isConnected) { setToast({msg:'Connect wallet first', type:'err'}); return }
@@ -313,15 +327,8 @@ function Forge() {
         gas: 1500000n,
       })
       if (hash) {
-        setToast({msg:'Switch forged! polling for address...', type:'ok'})
-        const receipt = await deploy.waitForDeployment?.() || null
-        const tc = await import('wagmi').then(m => m.waitForTransactionReceipt)
-        const r = await tc({ hash, chainId: 10143 })
-        if (r?.contractAddress) {
-          setContract(r.contractAddress)
-          localStorage.setItem('ashes_contract', r.contractAddress)
-          setToast({msg:'Switch live at ' + short(r.contractAddress), type:'ok'})
-        }
+        setToast({msg:'Switch forged — awaiting confirmation...', type:'ok'})
+        setPendingHash(hash)
       }
     } catch (e) {
       const msg = e?.shortMessage || e?.message || 'deploy failed'
@@ -330,23 +337,20 @@ function Forge() {
   }
 
   return (
-    <motion.div className="card forge-card" {...cardVariant}
-      style={{ maxWidth: 500, margin: '0 auto 30px auto', padding: '28px' }}
-    >
+    <motion.div className="card forge-card" {...cardVariant}>
       <h2 className="section-title font-gothic">Forge Your Switch</h2>
       <p className="panel-desc">Anyone can forge their own on-chain dead-man switch. You become its owner; the chain enforces your will after death.</p>
 
-      <div style={{ marginBottom: 18 }}>
+      <div className="forge-row">
         <label className="stat-label">HEIR ADDRESS</label>
         <input className="input" placeholder="0x... (beneficiary, not yourself)"
           value={benInput} onChange={e=>setBenInput(e.target.value)} />
       </div>
 
-      <div style={{ marginBottom: 18 }}>
-        <label className="stat-label">TIMEOUT (DAYS): <span style={{color:'var(--ember)'}}>{days}</span></label>
-        <input type="range" min="1" max="365" value={days}
-          onChange={e=>setDays(e.target.value)}
-          style={{ width: '100%', accentColor: '#f6851b', cursor: 'pointer' }} />
+      <div className="forge-row">
+        <label className="stat-label">TIMEOUT (DAYS): <span className="forge-ember">{days}</span></label>
+        <input type="range" className="forge-slider" min="1" max="365" value={days}
+          onChange={e=>setDays(e.target.value)} />
       </div>
 
       <motion.button className="btn-primary btn-forge"
@@ -354,15 +358,13 @@ function Forge() {
         whileHover={{ scale: 1.02, y: -2, boxShadow: '0 12px 50px rgba(255,107,28,0.5)' }}
         whileTap={{ scale: 0.98 }}
         disabled={deploy.isPending}
-        style={{ width: '100%' }}
       >
         {deploy.isPending ? 'Forging...' : 'Forge Your Switch'}
       </motion.button>
       <AnimatePresence>
         {toast.msg && (
-          <motion.div className={'toast ' + (toast.type === 'err' ? 'toast-err' : 'toast-ok')}
+          <motion.div className={'toast static-toast ' + (toast.type === 'err' ? 'toast-err' : 'toast-ok')}
             initial={{ x: 120, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 120, opacity: 0 }}
-            style={{ position: 'static', marginTop: 14 }}
           >{toast.msg}</motion.div>
         )}
       </AnimatePresence>
@@ -395,6 +397,7 @@ function Inner() {
   const showDashboard = isConnected && !isConnecting
   return (
     <ContractCtx.Provider value={value.address}>
+      <SetContractCtx.Provider value={setContract}>
       <div className="app">
         <AshFlakes />
         <motion.header className="hero" {...fadeUp}>
@@ -409,7 +412,7 @@ function Inner() {
           <DividerSvg width={180} />
         </motion.header>
         <motion.div
-          style={{ maxWidth: 760, margin: '0 auto', padding: '0 20px', display: 'flex', justifyContent: 'center' }}
+          className="maxw-tight flex-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5, duration: 0.6 }}
@@ -418,12 +421,12 @@ function Inner() {
         </motion.div>
         <div style={{ height: 40 }} />
         <AnimatePresence mode="wait">
-            {isReconnecting ? (
-              <motion.div key="reconnecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', color: 'var(--bone-fade)' }}>
-                Reconnecting...
-              </motion.div>
-            ) : showDashboard ? (
+          {isReconnecting ? (
+            <motion.div key="reconnecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="reconnecting-msg">
+              Reconnecting...
+            </motion.div>
+          ) : showDashboard ? (
             <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Forge />
               <Dashboard />
@@ -443,20 +446,20 @@ function Inner() {
             title="Click to copy"
           >CONTRACT :: {value.address.slice(0,20)}...{value.address.slice(-6)} ⎘</motion.p>
           {contract !== DEMO_CONTRACT && (
-            <motion.button
+            <motion.button className="btn-ghost"
               onClick={() => { localStorage.removeItem('ashes_contract'); setContract(DEMO_CONTRACT) }}
               whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-              style={{ textTransform: 'none', font: 'inherit', background: 'transparent', color: 'var(--bone-fade)', padding: '4px 12px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 6, marginTop: 8 }}
             >← back to demo switch</motion.button>
           )}
           <p className="footer-sig">† BUILT ON MONAD · BY dropxtor †</p>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 12 }}>
-            <a href="https://github.com/dropmoltbot/ashes" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>GITHUB ↗</a>
-            <a href={`https://testnet.monadexplorer.com/address/${value.address}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>EXPLORER ↗</a>
-            <a href="https://x.com/0xDropxtor" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--bone-fade)', fontFamily: "'JetBrains Mono', monospace", fontSize: 11, letterSpacing: '0.2em', textDecoration: 'none' }}>X ↗</a>
+          <div className="footer-links">
+            <a className="footer-link" href="https://github.com/dropmoltbot/ashes" target="_blank" rel="noopener noreferrer">GITHUB ↗</a>
+            <a className="footer-link" href={`https://testnet.monadexplorer.com/address/${value.address}`} target="_blank" rel="noopener noreferrer">EXPLORER ↗</a>
+            <a className="footer-link" href="https://x.com/0xDropxtor" target="_blank" rel="noopener noreferrer">X ↗</a>
           </div>
         </footer>
       </div>
+      </SetContractCtx.Provider>
     </ContractCtx.Provider>
   )
 }

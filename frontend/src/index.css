@@ -66,3 +66,41 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 .footer-contract{font-family:'JetBrains Mono',monospace;letter-spacing:0.1em;margin-bottom:12px;word-break:break-all}
 .footer-sig{font-family:'Cinzel',serif;letter-spacing:0.2em;font-size:12px;color:var(--bone-dim)}
 @media(max-width:600px){.title{font-size:36px;letter-spacing:0.15em}.subtitle{font-size:16px}.container{padding:20px 16px}.card{padding:24px 20px}.hero{padding:40px 0 20px}.cross-symbol{font-size:42px}.ring-wrapper{width:180px;height:180px}.ring-number{font-size:32px}.tab{font-size:10px;min-width:80px}}
+
+/* === Utility classes (factor inline styles) === */
+.flex-center{display:flex;align-items:center;justify-content:center;gap:16px}
+.flex-col{display:flex;flex-direction:column}
+.maxw-tight{max-width:760px;margin:0 auto;padding:0 20px}
+.btn-ghost{background:transparent;color:var(--bone-fade);padding:4px 12px;cursor:pointer;border:1px solid rgba(255,255,255,0.15);border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.2em;margin-top:8px}
+.btn-ghost:hover{color:var(--ember);border-color:rgba(255,107,28,0.4)}
+.loading-state{text-align:center;padding:20px;opacity:0.5;font-family:'JetBrains Mono',monospace;font-size:12px}
+.reconnecting-msg{text-align:center;font-family:'JetBrains Mono',monospace;color:var(--bone-fade)}
+.footer-links{display:flex;gap:16px;justify-content:center;margin-top:12px}
+.footer-link{color:var(--bone-fade);font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.2em;text-decoration:none;transition:color 0.2s}
+.footer-link:hover{color:var(--ember)}
+.stat-glow{text-shadow:0 0 10px rgba(255,107,28,0.6)}
+.forge-card{max-width:500px;margin:0 auto 30px auto;padding:28px}
+.forge-row{margin-bottom:18px}
+.forge-slider{width:100%;accent-color:#f6851b;cursor:pointer}
+.forge-ember{color:var(--ember)}
+.sm-mt-14{margin-top:14px}
+.static-toast{position:static;margin-top:14px}
+
+/* === Perf: contain flake animations === */
+.ash-container{contain:strict}
+
+/* === A11y: focus visible === */
+*:focus-visible{outline:2px solid var(--ember);outline-offset:2px}
+.btn-primary:focus-visible, .btn-ghost:focus-visible, .tab:focus-visible{outline-offset:4px}
+
+/* === Optimize: HTML rendering hint === */
+.tile-layer{contain:paint}
+
+/* Scrollbar gothique */
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:#0a0508}
+::-webkit-scrollbar-thumb{background:rgba(139,24,24,0.4);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(139,24,24,0.6)}
+
+/* Selection */
+::selection{background:rgba(139,24,24,0.6);color:var(--bone)}
