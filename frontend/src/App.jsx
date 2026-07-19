@@ -373,6 +373,23 @@ function Forge() {
   )
 }
 
+function DemoBanner() {
+  return (
+    <motion.div className="card read-only-banner" style={{
+        background: 'linear-gradient(135deg, rgba(139,24,24,0.12), rgba(255,107,28,0.06))',
+        borderColor: 'rgba(255,107,28,0.3)',
+        maxWidth: 720, margin: '0 auto 24px'
+      }} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+      <div style={{ color: 'var(--ember-soft)', fontFamily: "'Cinzel', serif", fontSize: 13, letterSpacing: '0.15em', marginBottom: 8 }}>
+        VIEWING DEMO SWITCH
+      </div>
+      <p className="panel-desc">
+        This read-only demo belongs to dropxtor. To interact onchain (check-in, fund, claim), connect your wallet and forge your own.
+      </p>
+    </motion.div>
+  )
+}
+
 function Dashboard() {
   const CONTRACT = useContract()
   const { address } = useAccount()
@@ -458,6 +475,7 @@ function Inner() {
             </motion.div>
           ) : (
             <motion.div key="intro" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <DemoBanner />
               <Landing />
             </motion.div>
           )}
@@ -469,7 +487,7 @@ function Inner() {
             style={{ cursor: 'pointer' }}
             onClick={() => { navigator.clipboard.writeText(value.address); alert('Contract address copied') }}
             title="Click to copy"
-          >CONTRACT :: {value.address.slice(0,20)}...{value.address.slice(-6)} ⎘</motion.p>
+          >CONTRACT :: {contract !== DEMO_CONTRACT ? (value.address.slice(0,20) + '...' + value.address.slice(-6)) : 'not forged yet — connect wallet to forge your own'} ⎘</motion.p>
           {contract !== DEMO_CONTRACT && (
             <motion.button className="btn-ghost"
               onClick={() => { localStorage.removeItem('ashes_contract'); setContract(DEMO_CONTRACT) }}
