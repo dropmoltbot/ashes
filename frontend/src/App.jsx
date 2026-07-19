@@ -418,12 +418,12 @@ function Inner() {
         </motion.div>
         <div style={{ height: 40 }} />
         <AnimatePresence mode="wait">
-          {isReconnecting ? (
-            <motion.div key="reconnecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              style={{ textAlign: 'center', fontFamily: "'JetBrains Mono', monospace', color: 'var(--bone-fade)' }}>
-              Reconnecting...
-            </motion.div>
-          ) : showDashboard ? (
+            {isReconnecting ? (
+              <motion.div key="reconnecting" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', color: 'var(--bone-fade)' }}>
+                Reconnecting...
+              </motion.div>
+            ) : showDashboard ? (
             <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
               <Forge />
               <Dashboard />
