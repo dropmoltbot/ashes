@@ -155,13 +155,14 @@ function ActionTabs() {
     try {
       setToast({ msg: label + ' pending...', type: 'ok' })
       const cfg = { abi: ABI, address: CONTRACT, functionName }
-      // sanitize args
       if (arg !== undefined && arg !== null) {
         cfg.args = Array.isArray(arg) ? arg : [arg]
       }
       if (isPayable && valueEth) {
         try { cfg.value = parseEther(String(valueEth)) } catch(e) { setToast({ msg: 'Invalid amount', type: 'err' }); return }
       }
+      // Explicit gas to avoid gas-estimate failure when contract would revert (common on Monad testnet)
+      cfg.gas = 200000n
       const tx = await fn.writeContractAsync(cfg)
       if (tx?.hash) setToast({ msg: label + ' sent ✓ ' + tx.hash.slice(0, 10) + '...', type: 'ok' })
       else setToast({ msg: label + ' done ✓', type: 'ok' })
